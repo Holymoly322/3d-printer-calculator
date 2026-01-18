@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор заработка 3D принтера</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Утилиты для работы с паролем
+        const hashPassword = (password) => btoa(password);
+        const verifyPassword = (password, hash) => btoa(password) === hash;
+
+        // Компонент экрана установки пароля
+        const SetPasswordScreen = ({ onPasswordSet }) => {
+            const [password, setPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (password.length < 4) {
+                    setError('Пароль должен быть минимум 4 символа');
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    setError('Пароли не совпадают');
+                    return;
+                }
+                const hash = hashPassword(password);
+                localStorage.setItem('3dprinter_password', hash);
+                onPasswordSet();
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+                        <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                            🔒 Установка пароля
+                        </h1>
+                        <p className="text-gray-600 text-center mb-6">
+                            Создайте пароль для защиты ваших данных
+                        </p>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Пароль
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    placeholder="Введите пароль"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Подтверждение пароля
+                                </label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    placeholder="Повторите пароль"
+                                    required
+                                />
+                            </div>
+                            {error && (
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                                    {error}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition duration-200"
+                            >
+                                Установить пароль
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Компонент экрана входа
+        const LoginScreen = ({ onLogin }) => {
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                const storedHash = localStorage.getItem('3dprinter_password');
+                if (verifyPassword(password, storedHash)) {
+                    onLogin();
+                } else {
+                    setError('Неверный пароль');
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+                        <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            🖨️ 3D Printer Calculator
+                        </h1>
+                        <p className="text-gray-600 text-center mb-6">
+                            Введите пароль для доступа
+                        </p>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Пароль
+                                </label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    placeholder="Введите пароль"
+                                    required
+                                />
+                            </div>
+                            {error && (
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                                    {error}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition duration-200"
+                            >
+                                Войти
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Главное приложение
+        const App = () => {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [hasPassword, setHasPassword] = useState(false);
+
+            // Параметры принтера
+            const [printerCost, setPrinterCost] = useState(50000);
+            const [amortizationMonths, setAmortizationMonths] = useState(24);
+            const [electricityCost, setElectricityCost] = useState(6);
+            const [printerPower, setPrinterPower] = useState(0.3);
+
+            // Катушки
+            const [spools, setSpools] = useState([]);
+            const [newSpool, setNewSpool] = useState({ name: '', cost: '', weight: '' });
+
+            // Печати
+            const [prints, setPrints] = useState([]);
+            const [newPrint, setNewPrint] = useState({
+                date: new Date().toISOString().split('T')[0],
+                name: '',
+                spoolId: '',
+                weight: '',
+                hours: '',
+                salePrice: ''
+            });
+
+            const [activeTab, setActiveTab] = useState('dashboard');
+
+            // Проверка наличия пароля при загрузке
+            useEffect(() => {
+                const password = localStorage.getItem('3dprinter_password');
+                setHasPassword(!!password);
+            }, []);
+
+            // Загрузка данных из localStorage
+            useEffect(() => {
+                if (isAuthenticated) {
+                    const savedData = localStorage.getItem('3dprinter_data');
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        setPrinterCost(data.printerCost || 50000);
+                        setAmortizationMonths(data.amortizationMonths || 24);
+                        setElectricityCost(data.electricityCost || 6);
+                        setPrinterPower(data.printerPower || 0.3);
+                        setSpools(data.spools || []);
+                        setPrints(data.prints || []);
+                    }
+                }
+            }, [isAuthenticated]);
+
+            // Сохранение данных в localStorage
+            useEffect(() => {
+                if (isAuthenticated) {
+                    const data = {
+                        printerCost,
+                        amortizationMonths,
+                        electricityCost,
+                        printerPower,
+                        spools,
+                        prints
+                    };
+                    localStorage.setItem('3dprinter_data', JSON.stringify(data));
+                }
+            }, [printerCost, amortizationMonths, electricityCost, printerPower, spools, prints, isAuthenticated]);
+
+            const handlePasswordSet = () => {
+                setHasPassword(true);
+                setIsAuthenticated(true);
+            };
+
+            const handleLogin = () => {
+                setIsAuthenticated(true);
+            };
+
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+            };
+
+            const handleChangePassword = () => {
+                const oldPassword = prompt('Введите текущий пароль:');
+                const storedHash = localStorage.getItem('3dprinter_password');
+
+                if (!verifyPassword(oldPassword, storedHash)) {
+                    alert('Неверный пароль');
+                    return;
+                }
+
+                const newPassword = prompt('Введите новый пароль (минимум 4 символа):');
+                if (!newPassword || newPassword.length < 4) {
+                    alert('Пароль должен быть минимум 4 символа');
+                    return;
+                }
+
+                const confirmPassword = prompt('Подтвердите новый пароль:');
+                if (newPassword !== confirmPassword) {
+                    alert('Пароли не совпадают');
+                    return;
+                }
+
+                const hash = hashPassword(newPassword);
+                localStorage.setItem('3dprinter_password', hash);
+                alert('Пароль успешно изменен');
+            };
+
+            // Добавление катушки
+            const handleAddSpool = (e) => {
+                e.preventDefault();
+                const spool = {
+                    id: Date.now(),
+                    name: newSpool.name,
+                    cost: parseFloat(newSpool.cost),
+                    weight: parseFloat(newSpool.weight),
+                    pricePerGram: parseFloat(newSpool.cost) / parseFloat(newSpool.weight)
+                };
+                setSpools([...spools, spool]);
+                setNewSpool({ name: '', cost: '', weight: '' });
+            };
+
+            // Удаление катушки
+            const handleDeleteSpool = (id) => {
+                setSpools(spools.filter(s => s.id !== id));
+            };
+
+            // Добавление печати
+            const handleAddPrint = (e) => {
+                e.preventDefault();
+                const spool = spools.find(s => s.id === parseInt(newPrint.spoolId));
+                if (!spool) return;
+
+                const weight = parseFloat(newPrint.weight);
+                const hours = parseFloat(newPrint.hours);
+                const salePrice = parseFloat(newPrint.salePrice);
+
+                const materialCost = weight * spool.pricePerGram;
+                const electricityCostCalc = hours * printerPower * electricityCost;
+                const amortization = hours * (printerCost / amortizationMonths) / (30 * 24);
+                const totalCost = materialCost + electricityCostCalc + amortization;
+                const profit = salePrice - totalCost;
+
+                const print = {
+                    id: Date.now(),
+                    date: newPrint.date,
+                    name: newPrint.name,
+                    spoolName: spool.name,
+                    weight,
+                    hours,
+                    salePrice,
+                    materialCost,
+                    electricityCostCalc,
+                    amortization,
+                    totalCost,
+                    profit
+                };
+
+                setPrints([...prints, print]);
+                setNewPrint({
+                    date: new Date().toISOString().split('T')[0],
+                    name: '',
+                    spoolId: '',
+                    weight: '',
+                    hours: '',
+                    salePrice: ''
+                });
+            };
+
+            // Удаление печати
+            const handleDeletePrint = (id) => {
+                setPrints(prints.filter(p => p.id !== id));
+            };
+
+            // Расчет сводки
+            const totalProfit = prints.reduce((sum, p) => sum + p.profit, 0);
+            const totalRevenue = prints.reduce((sum, p) => sum + p.salePrice, 0);
+            const totalCost = prints.reduce((sum, p) => sum + p.totalCost, 0);
+            const totalPlastic = prints.reduce((sum, p) => sum + p.weight, 0);
+
+            if (!hasPassword) {
+                return <SetPasswordScreen onPasswordSet={handlePasswordSet} />;
+            }
+
+            if (!isAuthenticated) {
+                return <LoginScreen onLogin={handleLogin} />;
+            }
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Заголовок */}
+                        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+                            <div className="flex justify-between items-center flex-wrap gap-4">
+                                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                    🖨️ Калькулятор заработка 3D принтера
+                                </h1>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleChangePassword}
+                                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition duration-200"
+                                    >
+                                        🔑 Сменить пароль
+                                    </button>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition duration-200"
+                                    >
+                                        🚪 Выход
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Навигация */}
+                        <div className="bg-white rounded-2xl shadow-xl p-4 mb-6">
+                            <div className="flex flex-wrap gap-2">
+                                {['dashboard', 'printer', 'spools', 'prints'].map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`px-6 py-2 rounded-lg font-semibold transition duration-200 ${
+                                            activeTab === tab
+                                                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {tab === 'dashboard' && '📊 Сводка'}
+                                        {tab === 'printer' && '⚙️ Принтер'}
+                                        {tab === 'spools' && '🧵 Катушки'}
+                                        {tab === 'prints' && '📝 Печати'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Сводка */}
+                        {activeTab === 'dashboard' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                                <div className="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl shadow-xl p-6 text-white">
+                                    <div className="text-lg font-semibold mb-2">💰 Чистая прибыль</div>
+                                    <div className="text-3xl font-bold">{totalProfit.toFixed(2)} ₽</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl shadow-xl p-6 text-white">
+                                    <div className="text-lg font-semibold mb-2">📈 Общая выручка</div>
+                                    <div className="text-3xl font-bold">{totalRevenue.toFixed(2)} ₽</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-red-400 to-red-600 rounded-2xl shadow-xl p-6 text-white">
+                                    <div className="text-lg font-semibold mb-2">💸 Себестоимость</div>
+                                    <div className="text-3xl font-bold">{totalCost.toFixed(2)} ₽</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl shadow-xl p-6 text-white">
+                                    <div className="text-lg font-semibold mb-2">🧵 Израсходовано</div>
+                                    <div className="text-3xl font-bold">{totalPlastic.toFixed(0)} г</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Параметры принтера */}
+                        {activeTab === 'printer' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-6">
+                                <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                    ⚙️ Параметры принтера
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Стоимость принтера (₽)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={printerCost}
+                                            onChange={(e) => setPrinterCost(parseFloat(e.target.value) || 0)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Срок амортизации (месяцев)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={amortizationMonths}
+                                            onChange={(e) => setAmortizationMonths(parseFloat(e.target.value) || 0)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Стоимость электричества (₽/кВт·ч)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={electricityCost}
+                                            onChange={(e) => setElectricityCost(parseFloat(e.target.value) || 0)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Мощность принтера (кВт)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={printerPower}
+                                            onChange={(e) => setPrinterPower(parseFloat(e.target.value) || 0)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Катушки */}
+                        {activeTab === 'spools' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-6">
+                                <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                    🧵 Катушки пластика
+                                </h2>
+
+                                {/* Форма добавления катушки */}
+                                <form onSubmit={handleAddSpool} className="mb-6 bg-gray-50 p-4 rounded-xl">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <input
+                                            type="text"
+                                            placeholder="Название"
+                                            value={newSpool.name}
+                                            onChange={(e) => setNewSpool({...newSpool, name: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Стоимость (₽)"
+                                            value={newSpool.cost}
+                                            onChange={(e) => setNewSpool({...newSpool, cost: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Вес (г)"
+                                            value={newSpool.weight}
+                                            onChange={(e) => setNewSpool({...newSpool, weight: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition duration-200"
+                                        >
+                                            ➕ Добавить
+                                        </button>
+                                    </div>
+                                </form>
+
+                                {/* Таблица катушек */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left rounded-tl-lg">Название</th>
+                                                <th className="px-4 py-3 text-left">Стоимость (₽)</th>
+                                                <th className="px-4 py-3 text-left">Вес (г)</th>
+                                                <th className="px-4 py-3 text-left">₽/г</th>
+                                                <th className="px-4 py-3 text-left rounded-tr-lg">Действия</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {spools.map((spool, index) => (
+                                                <tr key={spool.id} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-purple-50 transition duration-150`}>
+                                                    <td className="px-4 py-3">{spool.name}</td>
+                                                    <td className="px-4 py-3">{spool.cost.toFixed(2)}</td>
+                                                    <td className="px-4 py-3">{spool.weight.toFixed(0)}</td>
+                                                    <td className="px-4 py-3">{spool.pricePerGram.toFixed(2)}</td>
+                                                    <td className="px-4 py-3">
+                                                        <button
+                                                            onClick={() => handleDeleteSpool(spool.id)}
+                                                            className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition duration-200"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {spools.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                                                        Нет катушек. Добавьте первую катушку.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Печати */}
+                        {activeTab === 'prints' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-6">
+                                <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                                    📝 Учет печатей
+                                </h2>
+
+                                {/* Форма добавления печати */}
+                                <form onSubmit={handleAddPrint} className="mb-6 bg-gray-50 p-4 rounded-xl">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                                        <input
+                                            type="date"
+                                            value={newPrint.date}
+                                            onChange={(e) => setNewPrint({...newPrint, date: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="Название детали"
+                                            value={newPrint.name}
+                                            onChange={(e) => setNewPrint({...newPrint, name: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <select
+                                            value={newPrint.spoolId}
+                                            onChange={(e) => setNewPrint({...newPrint, spoolId: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        >
+                                            <option value="">Выберите катушку</option>
+                                            {spools.map(spool => (
+                                                <option key={spool.id} value={spool.id}>{spool.name}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="number"
+                                            placeholder="Вес (г)"
+                                            value={newPrint.weight}
+                                            onChange={(e) => setNewPrint({...newPrint, weight: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            placeholder="Время (ч)"
+                                            value={newPrint.hours}
+                                            onChange={(e) => setNewPrint({...newPrint, hours: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Цена (₽)"
+                                            value={newPrint.salePrice}
+                                            onChange={(e) => setNewPrint({...newPrint, salePrice: e.target.value})}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                            required
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition duration-200"
+                                    >
+                                        ➕ Добавить печать
+                                    </button>
+                                </form>
+
+                                {/* Таблица печатей */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+                                            <tr>
+                                                <th className="px-2 py-3 text-left rounded-tl-lg">Дата</th>
+                                                <th className="px-2 py-3 text-left">Деталь</th>
+                                                <th className="px-2 py-3 text-left">Катушка</th>
+                                                <th className="px-2 py-3 text-left">Вес (г)</th>
+                                                <th className="px-2 py-3 text-left">Время (ч)</th>
+                                                <th className="px-2 py-3 text-left">Материал (₽)</th>
+                                                <th className="px-2 py-3 text-left">Электр. (₽)</th>
+                                                <th className="px-2 py-3 text-left">Аморт. (₽)</th>
+                                                <th className="px-2 py-3 text-left">Себест. (₽)</th>
+                                                <th className="px-2 py-3 text-left">Продажа (₽)</th>
+                                                <th className="px-2 py-3 text-left">Прибыль (₽)</th>
+                                                <th className="px-2 py-3 text-left rounded-tr-lg">Действия</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {prints.map((print, index) => (
+                                                <tr key={print.id} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-purple-50 transition duration-150`}>
+                                                    <td className="px-2 py-3">{print.date}</td>
+                                                    <td className="px-2 py-3">{print.name}</td>
+                                                    <td className="px-2 py-3">{print.spoolName}</td>
+                                                    <td className="px-2 py-3">{print.weight.toFixed(0)}</td>
+                                                    <td className="px-2 py-3">{print.hours.toFixed(1)}</td>
+                                                    <td className="px-2 py-3">{print.materialCost.toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{print.electricityCostCalc.toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{print.amortization.toFixed(2)}</td>
+                                                    <td className="px-2 py-3 font-semibold">{print.totalCost.toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{print.salePrice.toFixed(2)}</td>
+                                                    <td className={`px-2 py-3 font-bold ${print.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {print.profit.toFixed(2)}
+                                                    </td>
+                                                    <td className="px-2 py-3">
+                                                        <button
+                                                            onClick={() => handleDeletePrint(print.id)}
+                                                            className="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition duration-200"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {prints.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="12" className="px-4 py-8 text-center text-gray-500">
+                                                        Нет печатей. Добавьте первую печать.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

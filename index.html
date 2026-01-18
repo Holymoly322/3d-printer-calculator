@@ -8,6 +8,12 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -21,41 +27,141 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Утилиты для работы с паролем
-        const hashPassword = (password) => btoa(password);
-        const verifyPassword = (password, hash) => btoa(password) === hash;
+        // Firebase Configuration
+        // ВАЖНО: Замените эту конфигурацию на вашу из Firebase Console
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
 
-        // Компонент экрана установки пароля
-        const SetPasswordScreen = ({ onPasswordSet }) => {
+        // Инициализация Firebase
+        let db = null;
+        let auth = null;
+        let isFirebaseConfigured = false;
+
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+                isFirebaseConfigured = true;
+            }
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+        }
+
+        // Компонент для настройки Firebase
+        const FirebaseSetupScreen = () => {
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
+                        <h1 className="text-3xl font-bold text-center mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                            ⚙️ Настройка Firebase
+                        </h1>
+                        <div className="space-y-4 text-gray-700">
+                            <p className="text-center text-lg">
+                                Для работы приложения необходимо настроить Firebase
+                            </p>
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <p className="font-semibold mb-2">Инструкция:</p>
+                                <ol className="list-decimal list-inside space-y-2">
+                                    <li>Перейдите на <a href="https://console.firebase.google.com" target="_blank" className="text-blue-600 underline">Firebase Console</a></li>
+                                    <li>Создайте новый проект (или используйте существующий)</li>
+                                    <li>В настройках проекта найдите "Ваши приложения" → "Веб-приложение"</li>
+                                    <li>Скопируйте конфигурацию firebaseConfig</li>
+                                    <li>Включите Authentication → Email/Password</li>
+                                    <li>Создайте Firestore Database</li>
+                                    <li>Откройте файл index.html и замените firebaseConfig на ваш</li>
+                                </ol>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <p className="font-semibold mb-2">Правила безопасности Firestore:</p>
+                                <pre className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto text-sm">
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}`}
+                                </pre>
+                                <p className="text-sm mt-2">Скопируйте эти правила в Firestore Rules в Firebase Console</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Компонент регистрации
+        const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
+            const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
             const [confirmPassword, setConfirmPassword] = useState('');
             const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (password.length < 4) {
-                    setError('Пароль должен быть минимум 4 символа');
+                setError('');
+
+                if (password.length < 6) {
+                    setError('Пароль должен быть минимум 6 символов');
                     return;
                 }
                 if (password !== confirmPassword) {
                     setError('Пароли не совпадают');
                     return;
                 }
-                const hash = hashPassword(password);
-                localStorage.setItem('3dprinter_password', hash);
-                onPasswordSet();
+
+                setLoading(true);
+                try {
+                    await auth.createUserWithEmailAndPassword(email, password);
+                    onRegister();
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        setError('Этот email уже зарегистрирован');
+                    } else if (error.code === 'auth/invalid-email') {
+                        setError('Неверный формат email');
+                    } else if (error.code === 'auth/weak-password') {
+                        setError('Слишком слабый пароль');
+                    } else {
+                        setError('Ошибка регистрации: ' + error.message);
+                    }
+                } finally {
+                    setLoading(false);
+                }
             };
 
             return (
                 <div className="min-h-screen flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
                         <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                            🔒 Установка пароля
+                            📝 Регистрация
                         </h1>
                         <p className="text-gray-600 text-center mb-6">
-                            Создайте пароль для защиты ваших данных
+                            Создайте аккаунт для синхронизации данных
                         </p>
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    placeholder="your@email.com"
+                                    required
+                                    disabled={loading}
+                                />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Пароль
@@ -65,8 +171,9 @@
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                    placeholder="Введите пароль"
+                                    placeholder="Минимум 6 символов"
                                     required
+                                    disabled={loading}
                                 />
                             </div>
                             <div>
@@ -80,18 +187,27 @@
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                     placeholder="Повторите пароль"
                                     required
+                                    disabled={loading}
                                 />
                             </div>
                             {error && (
-                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm">
                                     {error}
                                 </div>
                             )}
                             <button
                                 type="submit"
-                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition duration-200"
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition duration-200 disabled:opacity-50"
                             >
-                                Установить пароль
+                                {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onSwitchToLogin}
+                                className="w-full text-purple-600 hover:text-purple-700 font-medium"
+                            >
+                                Уже есть аккаунт? Войти
                             </button>
                         </form>
                     </div>
@@ -99,18 +215,31 @@
             );
         };
 
-        // Компонент экрана входа
-        const LoginScreen = ({ onLogin }) => {
+        // Компонент входа
+        const LoginScreen = ({ onLogin, onSwitchToRegister }) => {
+            const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
-                const storedHash = localStorage.getItem('3dprinter_password');
-                if (verifyPassword(password, storedHash)) {
+                setError('');
+                setLoading(true);
+
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
                     onLogin();
-                } else {
-                    setError('Неверный пароль');
+                } catch (error) {
+                    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                        setError('Неверный email или пароль');
+                    } else if (error.code === 'auth/invalid-email') {
+                        setError('Неверный формат email');
+                    } else {
+                        setError('Ошибка входа: ' + error.message);
+                    }
+                } finally {
+                    setLoading(false);
                 }
             };
 
@@ -121,9 +250,23 @@
                             🖨️ 3D Printer Calculator
                         </h1>
                         <p className="text-gray-600 text-center mb-6">
-                            Введите пароль для доступа
+                            Войдите для доступа к вашим данным
                         </p>
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                    placeholder="your@email.com"
+                                    required
+                                    disabled={loading}
+                                />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Пароль
@@ -135,18 +278,27 @@
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                     placeholder="Введите пароль"
                                     required
+                                    disabled={loading}
                                 />
                             </div>
                             {error && (
-                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm">
                                     {error}
                                 </div>
                             )}
                             <button
                                 type="submit"
-                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition duration-200"
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition duration-200 disabled:opacity-50"
                             >
-                                Войти
+                                {loading ? 'Вход...' : 'Войти'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onSwitchToRegister}
+                                className="w-full text-purple-600 hover:text-purple-700 font-medium"
+                            >
+                                Нет аккаунта? Зарегистрироваться
                             </button>
                         </form>
                     </div>
@@ -156,8 +308,9 @@
 
         // Главное приложение
         const App = () => {
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
-            const [hasPassword, setHasPassword] = useState(false);
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [showRegister, setShowRegister] = useState(false);
 
             // Параметры принтера
             const [printerCost, setPrinterCost] = useState(50000);
@@ -182,105 +335,134 @@
 
             const [activeTab, setActiveTab] = useState('dashboard');
 
-            // Проверка наличия пароля при загрузке
+            // Проверка авторизации
             useEffect(() => {
-                const password = localStorage.getItem('3dprinter_password');
-                setHasPassword(!!password);
+                if (!isFirebaseConfigured) {
+                    setLoading(false);
+                    return;
+                }
+
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    setUser(user);
+                    setLoading(false);
+                });
+
+                return () => unsubscribe();
             }, []);
 
-            // Загрузка данных из localStorage
+            // Загрузка данных из Firestore
             useEffect(() => {
-                if (isAuthenticated) {
-                    const savedData = localStorage.getItem('3dprinter_data');
-                    if (savedData) {
-                        const data = JSON.parse(savedData);
-                        setPrinterCost(data.printerCost || 50000);
-                        setAmortizationMonths(data.amortizationMonths || 24);
-                        setElectricityCost(data.electricityCost || 6);
-                        setPrinterPower(data.printerPower || 0.3);
-                        setSpools(data.spools || []);
-                        setPrints(data.prints || []);
+                if (!user || !isFirebaseConfigured) return;
+
+                const userDoc = db.collection('users').doc(user.uid);
+
+                // Загрузка настроек принтера
+                const unsubscribeSettings = userDoc.collection('settings').doc('printer')
+                    .onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            setPrinterCost(data.printerCost || 50000);
+                            setAmortizationMonths(data.amortizationMonths || 24);
+                            setElectricityCost(data.electricityCost || 6);
+                            setPrinterPower(data.printerPower || 0.3);
+                        }
+                    });
+
+                // Загрузка катушек
+                const unsubscribeSpools = userDoc.collection('spools')
+                    .onSnapshot((snapshot) => {
+                        const spoolsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setSpools(spoolsData);
+                    });
+
+                // Загрузка печатей
+                const unsubscribePrints = userDoc.collection('prints')
+                    .orderBy('date', 'desc')
+                    .onSnapshot((snapshot) => {
+                        const printsData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setPrints(printsData);
+                    });
+
+                return () => {
+                    unsubscribeSettings();
+                    unsubscribeSpools();
+                    unsubscribePrints();
+                };
+            }, [user]);
+
+            // Сохранение настроек принтера
+            useEffect(() => {
+                if (!user || !isFirebaseConfigured) return;
+
+                const saveSettings = async () => {
+                    try {
+                        await db.collection('users').doc(user.uid).collection('settings').doc('printer').set({
+                            printerCost,
+                            amortizationMonths,
+                            electricityCost,
+                            printerPower
+                        }, { merge: true });
+                    } catch (error) {
+                        console.error('Error saving settings:', error);
                     }
+                };
+
+                const timeoutId = setTimeout(saveSettings, 500);
+                return () => clearTimeout(timeoutId);
+            }, [printerCost, amortizationMonths, electricityCost, printerPower, user]);
+
+            const handleLogout = async () => {
+                try {
+                    await auth.signOut();
+                } catch (error) {
+                    console.error('Logout error:', error);
                 }
-            }, [isAuthenticated]);
-
-            // Сохранение данных в localStorage
-            useEffect(() => {
-                if (isAuthenticated) {
-                    const data = {
-                        printerCost,
-                        amortizationMonths,
-                        electricityCost,
-                        printerPower,
-                        spools,
-                        prints
-                    };
-                    localStorage.setItem('3dprinter_data', JSON.stringify(data));
-                }
-            }, [printerCost, amortizationMonths, electricityCost, printerPower, spools, prints, isAuthenticated]);
-
-            const handlePasswordSet = () => {
-                setHasPassword(true);
-                setIsAuthenticated(true);
-            };
-
-            const handleLogin = () => {
-                setIsAuthenticated(true);
-            };
-
-            const handleLogout = () => {
-                setIsAuthenticated(false);
-            };
-
-            const handleChangePassword = () => {
-                const oldPassword = prompt('Введите текущий пароль:');
-                const storedHash = localStorage.getItem('3dprinter_password');
-
-                if (!verifyPassword(oldPassword, storedHash)) {
-                    alert('Неверный пароль');
-                    return;
-                }
-
-                const newPassword = prompt('Введите новый пароль (минимум 4 символа):');
-                if (!newPassword || newPassword.length < 4) {
-                    alert('Пароль должен быть минимум 4 символа');
-                    return;
-                }
-
-                const confirmPassword = prompt('Подтвердите новый пароль:');
-                if (newPassword !== confirmPassword) {
-                    alert('Пароли не совпадают');
-                    return;
-                }
-
-                const hash = hashPassword(newPassword);
-                localStorage.setItem('3dprinter_password', hash);
-                alert('Пароль успешно изменен');
             };
 
             // Добавление катушки
-            const handleAddSpool = (e) => {
+            const handleAddSpool = async (e) => {
                 e.preventDefault();
+                if (!user) return;
+
                 const spool = {
-                    id: Date.now(),
                     name: newSpool.name,
                     cost: parseFloat(newSpool.cost),
                     weight: parseFloat(newSpool.weight),
                     pricePerGram: parseFloat(newSpool.cost) / parseFloat(newSpool.weight)
                 };
-                setSpools([...spools, spool]);
-                setNewSpool({ name: '', cost: '', weight: '' });
+
+                try {
+                    await db.collection('users').doc(user.uid).collection('spools').add(spool);
+                    setNewSpool({ name: '', cost: '', weight: '' });
+                } catch (error) {
+                    console.error('Error adding spool:', error);
+                    alert('Ошибка добавления катушки');
+                }
             };
 
             // Удаление катушки
-            const handleDeleteSpool = (id) => {
-                setSpools(spools.filter(s => s.id !== id));
+            const handleDeleteSpool = async (id) => {
+                if (!user) return;
+                try {
+                    await db.collection('users').doc(user.uid).collection('spools').doc(id).delete();
+                } catch (error) {
+                    console.error('Error deleting spool:', error);
+                    alert('Ошибка удаления катушки');
+                }
             };
 
             // Добавление печати
-            const handleAddPrint = (e) => {
+            const handleAddPrint = async (e) => {
                 e.preventDefault();
-                const spool = spools.find(s => s.id === parseInt(newPrint.spoolId));
+                if (!user) return;
+
+                const spool = spools.find(s => s.id === newPrint.spoolId);
                 if (!spool) return;
 
                 const weight = parseFloat(newPrint.weight);
@@ -294,7 +476,6 @@
                 const profit = salePrice - totalCost;
 
                 const print = {
-                    id: Date.now(),
                     date: newPrint.date,
                     name: newPrint.name,
                     spoolName: spool.name,
@@ -308,34 +489,62 @@
                     profit
                 };
 
-                setPrints([...prints, print]);
-                setNewPrint({
-                    date: new Date().toISOString().split('T')[0],
-                    name: '',
-                    spoolId: '',
-                    weight: '',
-                    hours: '',
-                    salePrice: ''
-                });
+                try {
+                    await db.collection('users').doc(user.uid).collection('prints').add(print);
+                    setNewPrint({
+                        date: new Date().toISOString().split('T')[0],
+                        name: '',
+                        spoolId: '',
+                        weight: '',
+                        hours: '',
+                        salePrice: ''
+                    });
+                } catch (error) {
+                    console.error('Error adding print:', error);
+                    alert('Ошибка добавления печати');
+                }
             };
 
             // Удаление печати
-            const handleDeletePrint = (id) => {
-                setPrints(prints.filter(p => p.id !== id));
+            const handleDeletePrint = async (id) => {
+                if (!user) return;
+                try {
+                    await db.collection('users').doc(user.uid).collection('prints').doc(id).delete();
+                } catch (error) {
+                    console.error('Error deleting print:', error);
+                    alert('Ошибка удаления печати');
+                }
             };
 
             // Расчет сводки
-            const totalProfit = prints.reduce((sum, p) => sum + p.profit, 0);
-            const totalRevenue = prints.reduce((sum, p) => sum + p.salePrice, 0);
-            const totalCost = prints.reduce((sum, p) => sum + p.totalCost, 0);
-            const totalPlastic = prints.reduce((sum, p) => sum + p.weight, 0);
+            const totalProfit = prints.reduce((sum, p) => sum + (p.profit || 0), 0);
+            const totalRevenue = prints.reduce((sum, p) => sum + (p.salePrice || 0), 0);
+            const totalCost = prints.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+            const totalPlastic = prints.reduce((sum, p) => sum + (p.weight || 0), 0);
 
-            if (!hasPassword) {
-                return <SetPasswordScreen onPasswordSet={handlePasswordSet} />;
+            if (!isFirebaseConfigured) {
+                return <FirebaseSetupScreen />;
             }
 
-            if (!isAuthenticated) {
-                return <LoginScreen onLogin={handleLogin} />;
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-white text-2xl">Загрузка...</div>
+                    </div>
+                );
+            }
+
+            if (!user) {
+                if (showRegister) {
+                    return <RegisterScreen
+                        onRegister={() => setShowRegister(false)}
+                        onSwitchToLogin={() => setShowRegister(false)}
+                    />;
+                }
+                return <LoginScreen
+                    onLogin={() => {}}
+                    onSwitchToRegister={() => setShowRegister(true)}
+                />;
             }
 
             return (
@@ -344,16 +553,13 @@
                         {/* Заголовок */}
                         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
                             <div className="flex justify-between items-center flex-wrap gap-4">
-                                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                                    🖨️ Калькулятор заработка 3D принтера
-                                </h1>
+                                <div>
+                                    <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                                        🖨️ Калькулятор заработка 3D принтера
+                                    </h1>
+                                    <p className="text-sm text-gray-600 mt-1">{user.email}</p>
+                                </div>
                                 <div className="flex gap-2">
-                                    <button
-                                        onClick={handleChangePassword}
-                                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition duration-200"
-                                    >
-                                        🔑 Сменить пароль
-                                    </button>
                                     <button
                                         onClick={handleLogout}
                                         className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition duration-200"
@@ -645,15 +851,15 @@
                                                     <td className="px-2 py-3">{print.date}</td>
                                                     <td className="px-2 py-3">{print.name}</td>
                                                     <td className="px-2 py-3">{print.spoolName}</td>
-                                                    <td className="px-2 py-3">{print.weight.toFixed(0)}</td>
-                                                    <td className="px-2 py-3">{print.hours.toFixed(1)}</td>
-                                                    <td className="px-2 py-3">{print.materialCost.toFixed(2)}</td>
-                                                    <td className="px-2 py-3">{print.electricityCostCalc.toFixed(2)}</td>
-                                                    <td className="px-2 py-3">{print.amortization.toFixed(2)}</td>
-                                                    <td className="px-2 py-3 font-semibold">{print.totalCost.toFixed(2)}</td>
-                                                    <td className="px-2 py-3">{print.salePrice.toFixed(2)}</td>
-                                                    <td className={`px-2 py-3 font-bold ${print.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {print.profit.toFixed(2)}
+                                                    <td className="px-2 py-3">{print.weight?.toFixed(0)}</td>
+                                                    <td className="px-2 py-3">{print.hours?.toFixed(1)}</td>
+                                                    <td className="px-2 py-3">{print.materialCost?.toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{print.electricityCostCalc?.toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{print.amortization?.toFixed(2)}</td>
+                                                    <td className="px-2 py-3 font-semibold">{print.totalCost?.toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{print.salePrice?.toFixed(2)}</td>
+                                                    <td className={`px-2 py-3 font-bold ${(print.profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {print.profit?.toFixed(2)}
                                                     </td>
                                                     <td className="px-2 py-3">
                                                         <button

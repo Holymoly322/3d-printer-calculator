@@ -9,10 +9,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
         body {
@@ -27,70 +25,118 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Firebase Configuration
-        // ВАЖНО: Замените эту конфигурацию на вашу из Firebase Console
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
+        // Supabase Configuration
+        const SUPABASE_URL = "https://dlfqzerwhxoyvzolxoux.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_ngeQdUAgquje4f2D8FNk3w_pP_p2GPq";
 
-        // Инициализация Firebase
-        let db = null;
-        let auth = null;
-        let isFirebaseConfigured = false;
+        // Инициализация Supabase
+        let supabase = null;
+        let isSupabaseConfigured = false;
 
         try {
-            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                auth = firebase.auth();
-                isFirebaseConfigured = true;
+            if (SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                isSupabaseConfigured = true;
             }
         } catch (error) {
-            console.error("Firebase initialization error:", error);
+            console.error("Supabase initialization error:", error);
         }
 
-        // Компонент для настройки Firebase
-        const FirebaseSetupScreen = () => {
+        // Компонент для настройки Supabase
+        const SupabaseSetupScreen = () => {
             return (
                 <div className="min-h-screen flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
-                        <h1 className="text-3xl font-bold text-center mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                            ⚙️ Настройка Firebase
+                        <h1 className="text-3xl font-bold text-center mb-4 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                            ⚡ Настройка Supabase
                         </h1>
                         <div className="space-y-4 text-gray-700">
                             <p className="text-center text-lg">
-                                Для работы приложения необходимо настроить Firebase
+                                Для работы приложения необходимо настроить Supabase (2 минуты!)
                             </p>
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <p className="font-semibold mb-2 text-green-800">✨ Почему Supabase проще Firebase:</p>
+                                <ul className="list-disc list-inside space-y-1 text-sm">
+                                    <li>Регистрация через GitHub в 1 клик</li>
+                                    <li>Всего 2 параметра вместо 6</li>
+                                    <li>Создание проекта за 30 секунд</li>
+                                    <li>Автоматическая настройка безопасности</li>
+                                </ul>
+                            </div>
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                <p className="font-semibold mb-2">Инструкция:</p>
-                                <ol className="list-decimal list-inside space-y-2">
-                                    <li>Перейдите на <a href="https://console.firebase.google.com" target="_blank" className="text-blue-600 underline">Firebase Console</a></li>
-                                    <li>Создайте новый проект (или используйте существующий)</li>
-                                    <li>В настройках проекта найдите "Ваши приложения" → "Веб-приложение"</li>
-                                    <li>Скопируйте конфигурацию firebaseConfig</li>
-                                    <li>Включите Authentication → Email/Password</li>
-                                    <li>Создайте Firestore Database</li>
-                                    <li>Откройте файл index.html и замените firebaseConfig на ваш</li>
+                                <p className="font-semibold mb-2">📋 Быстрая инструкция:</p>
+                                <ol className="list-decimal list-inside space-y-2 text-sm">
+                                    <li>Откройте <a href="https://supabase.com" target="_blank" className="text-blue-600 underline">supabase.com</a></li>
+                                    <li>Нажмите "Start your project" → войдите через GitHub</li>
+                                    <li>Создайте новый проект (выберите регион, придумайте пароль БД)</li>
+                                    <li>Дождитесь создания проекта (~30 сек)</li>
+                                    <li>В меню слева: Settings → API</li>
+                                    <li>Скопируйте: <b>Project URL</b> и <b>anon public key</b></li>
+                                    <li>Откройте файл index.html и вставьте их (строки 26-27)</li>
                                 </ol>
                             </div>
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <p className="font-semibold mb-2">Правила безопасности Firestore:</p>
-                                <pre className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto text-sm">
-{`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}`}
+                                <p className="font-semibold mb-2">🔐 Настройка безопасности:</p>
+                                <p className="text-sm mb-2">После вставки конфигурации, перейдите в <b>SQL Editor</b> и выполните этот запрос:</p>
+                                <pre className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto text-xs">
+{`-- Создание таблиц
+CREATE TABLE printer_settings (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  printer_cost DECIMAL DEFAULT 50000,
+  amortization_months INTEGER DEFAULT 24,
+  electricity_cost DECIMAL DEFAULT 6,
+  printer_power DECIMAL DEFAULT 0.3,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE spools (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  cost DECIMAL NOT NULL,
+  weight DECIMAL NOT NULL,
+  price_per_gram DECIMAL NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE prints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  name TEXT NOT NULL,
+  spool_name TEXT NOT NULL,
+  weight DECIMAL NOT NULL,
+  hours DECIMAL NOT NULL,
+  sale_price DECIMAL NOT NULL,
+  material_cost DECIMAL NOT NULL,
+  electricity_cost_calc DECIMAL NOT NULL,
+  amortization DECIMAL NOT NULL,
+  total_cost DECIMAL NOT NULL,
+  profit DECIMAL NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Row Level Security
+ALTER TABLE printer_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE spools ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prints ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own settings" ON printer_settings
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own spools" ON spools
+  FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own prints" ON prints
+  FOR ALL USING (auth.uid() = user_id);`}
                                 </pre>
-                                <p className="text-sm mt-2">Скопируйте эти правила в Firestore Rules в Firebase Console</p>
+                                <p className="text-xs mt-2 text-gray-600">Скопируйте весь код и выполните его в SQL Editor</p>
+                            </div>
+                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                <p className="font-semibold mb-2 text-purple-800">📖 Подробная инструкция:</p>
+                                <p className="text-sm">
+                                    Смотрите файл <a href="https://github.com/Holymoly322/3d-printer-calculator/blob/master/SUPABASE_SETUP.md" target="_blank" className="text-blue-600 underline">SUPABASE_SETUP.md</a> в репозитории
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -105,6 +151,7 @@ service cloud.firestore {
             const [confirmPassword, setConfirmPassword] = useState('');
             const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
+            const [success, setSuccess] = useState(false);
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
@@ -121,22 +168,33 @@ service cloud.firestore {
 
                 setLoading(true);
                 try {
-                    await auth.createUserWithEmailAndPassword(email, password);
-                    onRegister();
+                    const { data, error } = await supabase.auth.signUp({
+                        email: email,
+                        password: password,
+                    });
+
+                    if (error) throw error;
+
+                    setSuccess(true);
+                    setTimeout(() => onRegister(), 2000);
                 } catch (error) {
-                    if (error.code === 'auth/email-already-in-use') {
-                        setError('Этот email уже зарегистрирован');
-                    } else if (error.code === 'auth/invalid-email') {
-                        setError('Неверный формат email');
-                    } else if (error.code === 'auth/weak-password') {
-                        setError('Слишком слабый пароль');
-                    } else {
-                        setError('Ошибка регистрации: ' + error.message);
-                    }
+                    setError(error.message);
                 } finally {
                     setLoading(false);
                 }
             };
+
+            if (success) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <div className="text-6xl mb-4">✅</div>
+                            <h2 className="text-2xl font-bold text-green-600 mb-2">Регистрация успешна!</h2>
+                            <p className="text-gray-600">Перенаправляем в приложение...</p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="min-h-screen flex items-center justify-center p-4">
@@ -228,16 +286,15 @@ service cloud.firestore {
                 setLoading(true);
 
                 try {
-                    await auth.signInWithEmailAndPassword(email, password);
+                    const { data, error } = await supabase.auth.signInWithPassword({
+                        email: email,
+                        password: password,
+                    });
+
+                    if (error) throw error;
                     onLogin();
                 } catch (error) {
-                    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-                        setError('Неверный email или пароль');
-                    } else if (error.code === 'auth/invalid-email') {
-                        setError('Неверный формат email');
-                    } else {
-                        setError('Ошибка входа: ' + error.message);
-                    }
+                    setError('Неверный email или пароль');
                 } finally {
                     setLoading(false);
                 }
@@ -337,80 +394,105 @@ service cloud.firestore {
 
             // Проверка авторизации
             useEffect(() => {
-                if (!isFirebaseConfigured) {
+                if (!isSupabaseConfigured) {
                     setLoading(false);
                     return;
                 }
 
-                const unsubscribe = auth.onAuthStateChanged((user) => {
-                    setUser(user);
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    setUser(session?.user ?? null);
                     setLoading(false);
                 });
 
-                return () => unsubscribe();
+                const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+                    setUser(session?.user ?? null);
+                });
+
+                return () => subscription.unsubscribe();
             }, []);
 
-            // Загрузка данных из Firestore
+            // Загрузка данных
             useEffect(() => {
-                if (!user || !isFirebaseConfigured) return;
+                if (!user || !isSupabaseConfigured) return;
 
-                const userDoc = db.collection('users').doc(user.uid);
+                loadData();
 
-                // Загрузка настроек принтера
-                const unsubscribeSettings = userDoc.collection('settings').doc('printer')
-                    .onSnapshot((doc) => {
-                        if (doc.exists) {
-                            const data = doc.data();
-                            setPrinterCost(data.printerCost || 50000);
-                            setAmortizationMonths(data.amortizationMonths || 24);
-                            setElectricityCost(data.electricityCost || 6);
-                            setPrinterPower(data.printerPower || 0.3);
-                        }
-                    });
+                // Подписка на изменения
+                const spoolsSubscription = supabase
+                    .channel('spools_changes')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'spools', filter: `user_id=eq.${user.id}` }, () => {
+                        loadSpools();
+                    })
+                    .subscribe();
 
-                // Загрузка катушек
-                const unsubscribeSpools = userDoc.collection('spools')
-                    .onSnapshot((snapshot) => {
-                        const spoolsData = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        setSpools(spoolsData);
-                    });
-
-                // Загрузка печатей
-                const unsubscribePrints = userDoc.collection('prints')
-                    .orderBy('date', 'desc')
-                    .onSnapshot((snapshot) => {
-                        const printsData = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        setPrints(printsData);
-                    });
+                const printsSubscription = supabase
+                    .channel('prints_changes')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'prints', filter: `user_id=eq.${user.id}` }, () => {
+                        loadPrints();
+                    })
+                    .subscribe();
 
                 return () => {
-                    unsubscribeSettings();
-                    unsubscribeSpools();
-                    unsubscribePrints();
+                    spoolsSubscription.unsubscribe();
+                    printsSubscription.unsubscribe();
                 };
             }, [user]);
 
+            const loadData = async () => {
+                await loadSettings();
+                await loadSpools();
+                await loadPrints();
+            };
+
+            const loadSettings = async () => {
+                const { data, error } = await supabase
+                    .from('printer_settings')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (data) {
+                    setPrinterCost(data.printer_cost);
+                    setAmortizationMonths(data.amortization_months);
+                    setElectricityCost(data.electricity_cost);
+                    setPrinterPower(data.printer_power);
+                }
+            };
+
+            const loadSpools = async () => {
+                const { data, error } = await supabase
+                    .from('spools')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
+
+                if (data) setSpools(data);
+            };
+
+            const loadPrints = async () => {
+                const { data, error } = await supabase
+                    .from('prints')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('date', { ascending: false });
+
+                if (data) setPrints(data);
+            };
+
             // Сохранение настроек принтера
             useEffect(() => {
-                if (!user || !isFirebaseConfigured) return;
+                if (!user || !isSupabaseConfigured) return;
 
                 const saveSettings = async () => {
-                    try {
-                        await db.collection('users').doc(user.uid).collection('settings').doc('printer').set({
-                            printerCost,
-                            amortizationMonths,
-                            electricityCost,
-                            printerPower
-                        }, { merge: true });
-                    } catch (error) {
-                        console.error('Error saving settings:', error);
-                    }
+                    await supabase
+                        .from('printer_settings')
+                        .upsert({
+                            user_id: user.id,
+                            printer_cost: printerCost,
+                            amortization_months: amortizationMonths,
+                            electricity_cost: electricityCost,
+                            printer_power: printerPower,
+                        });
                 };
 
                 const timeoutId = setTimeout(saveSettings, 500);
@@ -418,11 +500,7 @@ service cloud.firestore {
             }, [printerCost, amortizationMonths, electricityCost, printerPower, user]);
 
             const handleLogout = async () => {
-                try {
-                    await auth.signOut();
-                } catch (error) {
-                    console.error('Logout error:', error);
-                }
+                await supabase.auth.signOut();
             };
 
             // Добавление катушки
@@ -431,30 +509,23 @@ service cloud.firestore {
                 if (!user) return;
 
                 const spool = {
+                    user_id: user.id,
                     name: newSpool.name,
                     cost: parseFloat(newSpool.cost),
                     weight: parseFloat(newSpool.weight),
-                    pricePerGram: parseFloat(newSpool.cost) / parseFloat(newSpool.weight)
+                    price_per_gram: parseFloat(newSpool.cost) / parseFloat(newSpool.weight)
                 };
 
-                try {
-                    await db.collection('users').doc(user.uid).collection('spools').add(spool);
+                const { error } = await supabase.from('spools').insert([spool]);
+
+                if (!error) {
                     setNewSpool({ name: '', cost: '', weight: '' });
-                } catch (error) {
-                    console.error('Error adding spool:', error);
-                    alert('Ошибка добавления катушки');
                 }
             };
 
             // Удаление катушки
             const handleDeleteSpool = async (id) => {
-                if (!user) return;
-                try {
-                    await db.collection('users').doc(user.uid).collection('spools').doc(id).delete();
-                } catch (error) {
-                    console.error('Error deleting spool:', error);
-                    alert('Ошибка удаления катушки');
-                }
+                await supabase.from('spools').delete().eq('id', id);
             };
 
             // Добавление печати
@@ -469,28 +540,30 @@ service cloud.firestore {
                 const hours = parseFloat(newPrint.hours);
                 const salePrice = parseFloat(newPrint.salePrice);
 
-                const materialCost = weight * spool.pricePerGram;
+                const materialCost = weight * spool.price_per_gram;
                 const electricityCostCalc = hours * printerPower * electricityCost;
                 const amortization = hours * (printerCost / amortizationMonths) / (30 * 24);
                 const totalCost = materialCost + electricityCostCalc + amortization;
                 const profit = salePrice - totalCost;
 
                 const print = {
+                    user_id: user.id,
                     date: newPrint.date,
                     name: newPrint.name,
-                    spoolName: spool.name,
+                    spool_name: spool.name,
                     weight,
                     hours,
-                    salePrice,
-                    materialCost,
-                    electricityCostCalc,
+                    sale_price: salePrice,
+                    material_cost: materialCost,
+                    electricity_cost_calc: electricityCostCalc,
                     amortization,
-                    totalCost,
+                    total_cost: totalCost,
                     profit
                 };
 
-                try {
-                    await db.collection('users').doc(user.uid).collection('prints').add(print);
+                const { error } = await supabase.from('prints').insert([print]);
+
+                if (!error) {
                     setNewPrint({
                         date: new Date().toISOString().split('T')[0],
                         name: '',
@@ -499,31 +572,22 @@ service cloud.firestore {
                         hours: '',
                         salePrice: ''
                     });
-                } catch (error) {
-                    console.error('Error adding print:', error);
-                    alert('Ошибка добавления печати');
                 }
             };
 
             // Удаление печати
             const handleDeletePrint = async (id) => {
-                if (!user) return;
-                try {
-                    await db.collection('users').doc(user.uid).collection('prints').doc(id).delete();
-                } catch (error) {
-                    console.error('Error deleting print:', error);
-                    alert('Ошибка удаления печати');
-                }
+                await supabase.from('prints').delete().eq('id', id);
             };
 
             // Расчет сводки
-            const totalProfit = prints.reduce((sum, p) => sum + (p.profit || 0), 0);
-            const totalRevenue = prints.reduce((sum, p) => sum + (p.salePrice || 0), 0);
-            const totalCost = prints.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-            const totalPlastic = prints.reduce((sum, p) => sum + (p.weight || 0), 0);
+            const totalProfit = prints.reduce((sum, p) => sum + (parseFloat(p.profit) || 0), 0);
+            const totalRevenue = prints.reduce((sum, p) => sum + (parseFloat(p.sale_price) || 0), 0);
+            const totalCost = prints.reduce((sum, p) => sum + (parseFloat(p.total_cost) || 0), 0);
+            const totalPlastic = prints.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0);
 
-            if (!isFirebaseConfigured) {
-                return <FirebaseSetupScreen />;
+            if (!isSupabaseConfigured) {
+                return <SupabaseSetupScreen />;
             }
 
             if (loading) {
@@ -678,7 +742,6 @@ service cloud.firestore {
                                     🧵 Катушки пластика
                                 </h2>
 
-                                {/* Форма добавления катушки */}
                                 <form onSubmit={handleAddSpool} className="mb-6 bg-gray-50 p-4 rounded-xl">
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <input
@@ -714,7 +777,6 @@ service cloud.firestore {
                                     </div>
                                 </form>
 
-                                {/* Таблица катушек */}
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
@@ -730,9 +792,9 @@ service cloud.firestore {
                                             {spools.map((spool, index) => (
                                                 <tr key={spool.id} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-purple-50 transition duration-150`}>
                                                     <td className="px-4 py-3">{spool.name}</td>
-                                                    <td className="px-4 py-3">{spool.cost.toFixed(2)}</td>
-                                                    <td className="px-4 py-3">{spool.weight.toFixed(0)}</td>
-                                                    <td className="px-4 py-3">{spool.pricePerGram.toFixed(2)}</td>
+                                                    <td className="px-4 py-3">{parseFloat(spool.cost).toFixed(2)}</td>
+                                                    <td className="px-4 py-3">{parseFloat(spool.weight).toFixed(0)}</td>
+                                                    <td className="px-4 py-3">{parseFloat(spool.price_per_gram).toFixed(2)}</td>
                                                     <td className="px-4 py-3">
                                                         <button
                                                             onClick={() => handleDeleteSpool(spool.id)}
@@ -763,7 +825,6 @@ service cloud.firestore {
                                     📝 Учет печатей
                                 </h2>
 
-                                {/* Форма добавления печати */}
                                 <form onSubmit={handleAddPrint} className="mb-6 bg-gray-50 p-4 rounded-xl">
                                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                                         <input
@@ -826,7 +887,6 @@ service cloud.firestore {
                                     </button>
                                 </form>
 
-                                {/* Таблица печатей */}
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
@@ -850,16 +910,16 @@ service cloud.firestore {
                                                 <tr key={print.id} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-purple-50 transition duration-150`}>
                                                     <td className="px-2 py-3">{print.date}</td>
                                                     <td className="px-2 py-3">{print.name}</td>
-                                                    <td className="px-2 py-3">{print.spoolName}</td>
-                                                    <td className="px-2 py-3">{print.weight?.toFixed(0)}</td>
-                                                    <td className="px-2 py-3">{print.hours?.toFixed(1)}</td>
-                                                    <td className="px-2 py-3">{print.materialCost?.toFixed(2)}</td>
-                                                    <td className="px-2 py-3">{print.electricityCostCalc?.toFixed(2)}</td>
-                                                    <td className="px-2 py-3">{print.amortization?.toFixed(2)}</td>
-                                                    <td className="px-2 py-3 font-semibold">{print.totalCost?.toFixed(2)}</td>
-                                                    <td className="px-2 py-3">{print.salePrice?.toFixed(2)}</td>
-                                                    <td className={`px-2 py-3 font-bold ${(print.profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {print.profit?.toFixed(2)}
+                                                    <td className="px-2 py-3">{print.spool_name}</td>
+                                                    <td className="px-2 py-3">{parseFloat(print.weight).toFixed(0)}</td>
+                                                    <td className="px-2 py-3">{parseFloat(print.hours).toFixed(1)}</td>
+                                                    <td className="px-2 py-3">{parseFloat(print.material_cost).toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{parseFloat(print.electricity_cost_calc).toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{parseFloat(print.amortization).toFixed(2)}</td>
+                                                    <td className="px-2 py-3 font-semibold">{parseFloat(print.total_cost).toFixed(2)}</td>
+                                                    <td className="px-2 py-3">{parseFloat(print.sale_price).toFixed(2)}</td>
+                                                    <td className={`px-2 py-3 font-bold ${parseFloat(print.profit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {parseFloat(print.profit).toFixed(2)}
                                                     </td>
                                                     <td className="px-2 py-3">
                                                         <button

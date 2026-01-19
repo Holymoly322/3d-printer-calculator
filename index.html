@@ -9,8 +9,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase SDK - загружаем синхронно -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 
     <style>
         body {
@@ -33,13 +33,19 @@
         let supabase = null;
         let isSupabaseConfigured = false;
 
-        try {
-            if (SUPABASE_URL !== "YOUR_SUPABASE_URL" && SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+        // Проверяем что SDK загружен и конфигурация установлена
+        if (typeof window.supabase !== 'undefined' &&
+            SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+            SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+            try {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 isSupabaseConfigured = true;
+                console.log("✅ Supabase initialized successfully");
+            } catch (error) {
+                console.error("❌ Supabase initialization error:", error);
             }
-        } catch (error) {
-            console.error("Supabase initialization error:", error);
+        } else {
+            console.warn("⚠️ Supabase SDK not loaded or config missing");
         }
 
         // Компонент для настройки Supabase

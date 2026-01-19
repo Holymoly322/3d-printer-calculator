@@ -4,6 +4,19 @@
 
 ⭐ **Синхронизация между устройствами** - войдите с одного аккаунта на разных устройствах, и все данные будут автоматически синхронизированы!
 
+---
+
+## 🌐 Демо
+
+**🚀 [Открыть приложение](https://holymoly322.github.io/3d-printer-calculator/)**
+
+[![Demo](https://img.shields.io/badge/Demo-Live-brightgreen?style=for-the-badge&logo=github)](https://holymoly322.github.io/3d-printer-calculator/)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/Holymoly322/3d-printer-calculator)
+
+> **Примечание:** Для работы требуется настройка Supabase (бесплатно, 2 минуты). См. [инструкцию по настройке](SUPABASE_SETUP.md).
+
+---
+
 ## ✨ Возможности
 
 ### 📊 Сводка (Dashboard)

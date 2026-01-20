@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -26,6 +27,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # States
 class PrintForm(StatesGroup):
     name = State()
+    gcode_or_manual = State()  # Выбор: загрузить G-code или ввести вручную
     spool_id = State()
     weight = State()
     hours = State()
@@ -35,6 +37,80 @@ class SpoolForm(StatesGroup):
     name = State()
     cost = State()
     weight = State()
+
+# Функция парсинга G-code файла
+def parse_gcode(content: str):
+    """
+    Парсит G-code файл и извлекает информацию о весе пластика и времени печати
+    """
+    weight_grams = None
+    time_hours = None
+
+    # Разбираем файл построчно (первые 200 строк обычно содержат метаданные)
+    lines = content.split('\n')[:200]
+
+    for line in lines:
+        line = line.strip()
+
+        # PrusaSlicer - вес в граммах
+        if 'filament used [g]' in line.lower():
+            match = re.search(r'(\d+\.?\d*)', line)
+            if match:
+                weight_grams = float(match.group(1))
+
+        # PrusaSlicer - вес в мм -> конвертируем в граммы (примерно 1м = 2.4г для PLA 1.75мм)
+        elif 'filament used [mm]' in line.lower() or 'filament used:' in line.lower():
+            match = re.search(r'(\d+\.?\d*)', line)
+            if match and not weight_grams:
+                length_mm = float(match.group(1))
+                # Примерная конвертация: 1м (1000мм) = ~2.4г для PLA 1.75мм
+                weight_grams = (length_mm / 1000) * 2.4
+
+        # Cura - длина в метрах
+        elif 'filament used:' in line.lower() and 'm' in line:
+            match = re.search(r'(\d+\.?\d*)m', line)
+            if match and not weight_grams:
+                length_m = float(match.group(1))
+                weight_grams = length_m * 2.4
+
+        # Simplify3D - длина в мм
+        elif 'filament length:' in line.lower():
+            match = re.search(r'(\d+\.?\d*)\s*mm', line)
+            if match and not weight_grams:
+                length_mm = float(match.group(1))
+                weight_grams = (length_mm / 1000) * 2.4
+
+        # Время печати - различные форматы
+        # PrusaSlicer: ; estimated printing time (normal mode) = 2h 30m 15s
+        if 'estimated printing time' in line.lower() or 'print time' in line.lower():
+            hours_match = re.search(r'(\d+)h', line)
+            mins_match = re.search(r'(\d+)m', line)
+            secs_match = re.search(r'(\d+)s', line)
+
+            hours = int(hours_match.group(1)) if hours_match else 0
+            minutes = int(mins_match.group(1)) if mins_match else 0
+            seconds = int(secs_match.group(1)) if secs_match else 0
+
+            time_hours = hours + (minutes / 60) + (seconds / 3600)
+
+        # Cura: ;TIME:7200 (секунды)
+        elif line.startswith(';TIME:'):
+            match = re.search(r';TIME:(\d+)', line)
+            if match:
+                time_seconds = int(match.group(1))
+                time_hours = time_seconds / 3600
+
+        # Simplify3D: ;   Build time: 1 hour 30 minutes
+        elif 'build time:' in line.lower():
+            hours_match = re.search(r'(\d+)\s*hour', line)
+            mins_match = re.search(r'(\d+)\s*minute', line)
+
+            hours = int(hours_match.group(1)) if hours_match else 0
+            minutes = int(mins_match.group(1)) if mins_match else 0
+
+            time_hours = hours + (minutes / 60)
+
+    return weight_grams, time_hours
 
 # Главное меню
 def main_menu():
@@ -224,8 +300,98 @@ async def add_print_start(callback: types.CallbackQuery, state: FSMContext):
 async def add_print_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
 
+    # Предлагаем выбор: загрузить G-code или ввести вручную
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📄 Загрузить G-code файл", callback_data="upload_gcode")],
+        [InlineKeyboardButton(text="✍️ Ввести данные вручную", callback_data="manual_input")]
+    ])
+
+    await message.answer(
+        "Как вы хотите добавить данные о печати?",
+        reply_markup=keyboard
+    )
+    await state.set_state(PrintForm.gcode_or_manual)
+
+# Обработчик выбора загрузки G-code
+@dp.callback_query(F.data == "upload_gcode", PrintForm.gcode_or_manual)
+async def handle_upload_gcode(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(
+        "📄 Отправьте G-code файл (.gcode или .gco)\n\n"
+        "Бот автоматически извлечет из файла:\n"
+        "• Вес использованного пластика\n"
+        "• Время печати\n\n"
+        "Поддерживаются файлы от Cura, PrusaSlicer, Simplify3D"
+    )
+    # Остаемся в том же состоянии, ждем файл
+
+# Обработчик документов (G-code файлы)
+@dp.message(F.document, PrintForm.gcode_or_manual)
+async def handle_gcode_file(message: types.Message, state: FSMContext):
+    document = message.document
+
+    # Проверяем расширение файла
+    if not (document.file_name.endswith('.gcode') or document.file_name.endswith('.gco')):
+        await message.answer("❌ Пожалуйста, отправьте файл с расширением .gcode или .gco")
+        return
+
+    try:
+        # Скачиваем файл
+        file = await bot.get_file(document.file_id)
+        file_content = await bot.download_file(file.file_path)
+
+        # Читаем содержимое
+        content = file_content.read().decode('utf-8', errors='ignore')
+
+        # Парсим G-code
+        weight_grams, time_hours = parse_gcode(content)
+
+        if weight_grams and time_hours:
+            await state.update_data(weight=weight_grams, hours=time_hours)
+            await message.answer(
+                f"✅ Данные успешно извлечены из файла!\n\n"
+                f"⚖️ Вес: {weight_grams:.1f} г\n"
+                f"⏱️ Время: {time_hours:.2f} ч\n\n"
+                f"Теперь выберите катушку..."
+            )
+
+            # Показываем список катушек
+            user_id = str(message.from_user.id)
+            spools = supabase.table('spools').select('*').eq('user_id', user_id).execute()
+
+            text = "🧵 Выберите катушку (отправьте номер):\n\n"
+            for idx, spool in enumerate(spools.data, 1):
+                text += f"{idx}. {spool['name']} ({float(spool['price_per_gram']):.2f} ₽/г)\n"
+
+            await state.update_data(spools=spools.data)
+            await message.answer(text)
+            await state.set_state(PrintForm.spool_id)
+        else:
+            error_msg = "⚠️ Не удалось извлечь данные из файла.\n\n"
+            if not weight_grams:
+                error_msg += "• Вес пластика не найден\n"
+            if not time_hours:
+                error_msg += "• Время печати не найдено\n"
+            error_msg += "\nПопробуйте ввести данные вручную или проверьте файл."
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✍️ Ввести вручную", callback_data="manual_input")]
+            ])
+            await message.answer(error_msg, reply_markup=keyboard)
+
+    except Exception as e:
+        logger.error(f"Error parsing gcode: {e}")
+        await message.answer(
+            "❌ Ошибка при обработке файла. Попробуйте ввести данные вручную.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✍️ Ввести вручную", callback_data="manual_input")]
+            ])
+        )
+
+# Обработчик выбора ручного ввода
+@dp.callback_query(F.data == "manual_input", PrintForm.gcode_or_manual)
+async def handle_manual_input(callback: types.CallbackQuery, state: FSMContext):
     # Показываем список катушек
-    user_id = str(message.from_user.id)
+    user_id = str(callback.from_user.id)
     spools = supabase.table('spools').select('*').eq('user_id', user_id).execute()
 
     text = "🧵 Выберите катушку (отправьте номер):\n\n"
@@ -233,7 +399,7 @@ async def add_print_name(message: types.Message, state: FSMContext):
         text += f"{idx}. {spool['name']} ({float(spool['price_per_gram']):.2f} ₽/г)\n"
 
     await state.update_data(spools=spools.data)
-    await message.answer(text)
+    await callback.message.edit_text(text)
     await state.set_state(PrintForm.spool_id)
 
 @dp.message(PrintForm.spool_id)
@@ -248,8 +414,16 @@ async def add_print_spool(message: types.Message, state: FSMContext):
             return
 
         await state.update_data(selected_spool=spools[idx])
-        await message.answer("⚖️ Введите вес израсходованного пластика в граммах:")
-        await state.set_state(PrintForm.weight)
+
+        # Проверяем, есть ли уже вес и время из G-code
+        if 'weight' in data and 'hours' in data:
+            # Данные уже есть из G-code, переходим сразу к цене продажи
+            await message.answer("💵 Введите цену продажи в рублях:")
+            await state.set_state(PrintForm.sale_price)
+        else:
+            # Данные нужно ввести вручную
+            await message.answer("⚖️ Введите вес израсходованного пластика в граммах:")
+            await state.set_state(PrintForm.weight)
     except ValueError:
         await message.answer("❌ Введите номер катушки:")
 

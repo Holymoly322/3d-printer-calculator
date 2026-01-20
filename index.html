@@ -385,27 +385,46 @@ CREATE POLICY "Users can manage own prints" ON prints
 
             // Инициализация Supabase после загрузки DOM
             useEffect(() => {
-                console.log('Initializing Supabase...');
-                console.log('window.supabase:', typeof window.supabase);
+                const initSupabase = () => {
+                    console.log('Initializing Supabase...');
+                    console.log('window.supabase:', typeof window.supabase);
 
-                if (typeof window.supabase !== 'undefined' &&
-                    SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
-                    SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
-                    try {
-                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                        setIsSupabaseConfigured(true);
-                        console.log("✅ Supabase initialized successfully");
-                    } catch (error) {
-                        console.error("❌ Supabase initialization error:", error);
+                    if (typeof window.supabase !== 'undefined' &&
+                        SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+                        SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+                        try {
+                            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                            setIsSupabaseConfigured(true);
+                            console.log("✅ Supabase initialized successfully");
+                        } catch (error) {
+                            console.error("❌ Supabase initialization error:", error);
+                            setIsSupabaseConfigured(false);
+                        }
+                    } else {
+                        console.warn("⚠️ Supabase SDK not loaded or config missing");
+                        console.warn("SDK available:", typeof window.supabase !== 'undefined');
+                        console.warn("URL configured:", SUPABASE_URL !== "YOUR_SUPABASE_URL");
+                        console.warn("Key configured:", SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY");
                         setIsSupabaseConfigured(false);
                     }
-                } else {
-                    console.warn("⚠️ Supabase SDK not loaded or config missing");
-                    console.warn("SDK available:", typeof window.supabase !== 'undefined');
-                    console.warn("URL configured:", SUPABASE_URL !== "YOUR_SUPABASE_URL");
-                    console.warn("Key configured:", SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY");
-                    setIsSupabaseConfigured(false);
-                }
+                };
+
+                // Даем SDK время загрузиться, проверяем несколько раз
+                let attempts = 0;
+                const maxAttempts = 10;
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    if (typeof window.supabase !== 'undefined') {
+                        clearInterval(checkInterval);
+                        initSupabase();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        console.error('Supabase SDK failed to load after', maxAttempts, 'attempts');
+                        setIsSupabaseConfigured(false);
+                    }
+                }, 100);
+
+                return () => clearInterval(checkInterval);
             }, []);
 
             // Проверка авторизации

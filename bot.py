@@ -10,6 +10,10 @@ from aiogram.fsm.state import State, StatesGroup
 from supabase import create_client, Client
 from datetime import datetime
 import asyncio
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения
+load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)

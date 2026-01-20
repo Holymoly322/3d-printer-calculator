@@ -8,3 +8,7 @@ venv/
 env/
 *.log
 .DS_Store
+*.png
+*.sql
+printer_bot.db
+bot_supabase_old.py

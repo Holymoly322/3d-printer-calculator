@@ -40,6 +40,9 @@ class SpoolForm(StatesGroup):
     cost = State()
     weight = State()
 
+class CalculatorState(StatesGroup):
+    waiting_file = State()
+
 # Инициализация базы данных
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -149,6 +152,7 @@ def parse_gcode(content: str):
 # Главное меню
 def main_menu():
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔍 Калькулятор G-code", callback_data="calculator")],
         [InlineKeyboardButton(text="📊 Сводка", callback_data="dashboard")],
         [InlineKeyboardButton(text="📝 Добавить печать", callback_data="add_print")],
         [InlineKeyboardButton(text="🧵 Управление катушками", callback_data="spools")],
@@ -185,6 +189,132 @@ async def cmd_start(message: types.Message):
         reply_markup=main_menu(),
         parse_mode="Markdown"
     )
+
+# Калькулятор G-code
+@dp.callback_query(F.data == "calculator")
+async def calculator_start(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(
+        "🔍 *Калькулятор G-code файла*\n\n"
+        "Отправьте мне файл G-code и я мгновенно рассчитаю:\n"
+        "• ⚖️ Вес пластика (граммы)\n"
+        "• ⏱️ Время печати (часы)\n"
+        "• 💰 Примерную стоимость\n\n"
+        "📄 Поддерживаемые форматы:\n"
+        "• Bambu Lab Studio (.gcode, .3mf)\n"
+        "• Cura, PrusaSlicer, Simplify3D (.gcode)\n\n"
+        "Отправьте файл:",
+        parse_mode="Markdown"
+    )
+    await state.set_state(CalculatorState.waiting_file)
+    await callback.answer()
+
+# Обработчик файлов для калькулятора
+@dp.message(F.document, CalculatorState.waiting_file)
+async def calculator_process_file(message: types.Message, state: FSMContext):
+    document = message.document
+
+    if not (document.file_name.endswith('.gcode') or document.file_name.endswith('.gco') or document.file_name.endswith('.3mf')):
+        await message.answer("❌ Пожалуйста, отправьте файл .gcode, .gco или .3mf")
+        return
+
+    try:
+        # Показываем что обрабатываем
+        processing_msg = await message.answer("⏳ Анализирую файл...")
+
+        # Скачиваем файл
+        file = await bot.get_file(document.file_id)
+        file_content = await bot.download_file(file.file_path)
+        content = file_content.read().decode('utf-8', errors='ignore')
+
+        # Парсим G-code
+        weight_grams, time_hours = parse_gcode(content)
+
+        # Получаем настройки пользователя для расчетов
+        user_id = str(message.from_user.id)
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute('SELECT * FROM printer_settings WHERE user_id = ?', (user_id,)) as cursor:
+                settings = await cursor.fetchone()
+
+        if weight_grams or time_hours:
+            text = f"✅ *Анализ файла: {document.file_name}*\n\n"
+
+            # Вес пластика
+            if weight_grams:
+                text += f"⚖️ *Вес пластика:* {weight_grams:.1f} г ({weight_grams/1000:.3f} кг)\n\n"
+            else:
+                text += "⚖️ *Вес пластика:* не найден\n\n"
+
+            # Время печати
+            if time_hours:
+                hours = int(time_hours)
+                minutes = int((time_hours - hours) * 60)
+                text += f"⏱️ *Время печати:* {hours}ч {minutes}мин ({time_hours:.2f} ч)\n\n"
+            else:
+                text += "⏱️ *Время печати:* не найдено\n\n"
+
+            # Примерная стоимость
+            if weight_grams and time_hours and settings:
+                text += "💰 *Примерная стоимость:*\n"
+
+                # Материал (из расчета 1.5₽/г для PLA)
+                material_cost = weight_grams * 1.5
+                text += f"├ Материал: ~{material_cost:.2f} ₽ (1.5₽/г)\n"
+
+                # Электричество
+                electricity_cost = time_hours * settings[4] * settings[3]  # printer_power * electricity_cost
+                text += f"├ Электричество: {electricity_cost:.2f} ₽\n"
+
+                # Амортизация
+                amortization = time_hours * (settings[1] / settings[2]) / (30 * 24)
+                text += f"├ Амортизация: {amortization:.2f} ₽\n"
+
+                # Итого
+                total_cost = material_cost + electricity_cost + amortization
+                text += f"└ *Итого: ~{total_cost:.2f} ₽*\n\n"
+
+                text += "_💡 Для точного расчета добавьте печать с вашей катушкой_"
+
+            # Удаляем сообщение "Обрабатываю"
+            await processing_msg.delete()
+
+            # Отправляем результат
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔍 Ещё файл", callback_data="calculator")],
+                [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back")]
+            ])
+            await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+            await state.clear()
+        else:
+            await processing_msg.delete()
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔍 Попробовать другой файл", callback_data="calculator")],
+                [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back")]
+            ])
+            await message.answer(
+                "⚠️ *Не удалось извлечь данные из файла*\n\n"
+                "Возможные причины:\n"
+                "• Файл не содержит метаданные\n"
+                "• Неподдерживаемый формат\n"
+                "• Файл поврежден\n\n"
+                "Попробуйте другой файл или экспортируйте G-code заново из слайсера.",
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+            await state.clear()
+
+    except Exception as e:
+        logger.error(f"Error in calculator: {e}")
+        await processing_msg.delete()
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back")]
+        ])
+        await message.answer(
+            "❌ *Ошибка при обработке файла*\n\n"
+            "Попробуйте другой файл или обратитесь к разработчику.",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        await state.clear()
 
 # Сводка
 @dp.callback_query(F.data == "dashboard")

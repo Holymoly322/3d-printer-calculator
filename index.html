@@ -29,24 +29,8 @@
         const SUPABASE_URL = "https://dlfqzerwhxoyvzolxoux.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsZnF6ZXJ3aHhveXZ6b2x4b3V4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NjE4MTgsImV4cCI6MjA4NDMzNzgxOH0.YN8PEk0BJk4DEYGXhSPXR0la3ZZgkp1MjJhLz_J2tF4";
 
-        // Инициализация Supabase
+        // Глобальные переменные для Supabase
         let supabase = null;
-        let isSupabaseConfigured = false;
-
-        // Проверяем что SDK загружен и конфигурация установлена
-        if (typeof window.supabase !== 'undefined' &&
-            SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
-            SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
-            try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                isSupabaseConfigured = true;
-                console.log("✅ Supabase initialized successfully");
-            } catch (error) {
-                console.error("❌ Supabase initialization error:", error);
-            }
-        } else {
-            console.warn("⚠️ Supabase SDK not loaded or config missing");
-        }
 
         // Компонент для настройки Supabase
         const SupabaseSetupScreen = () => {
@@ -374,6 +358,7 @@ CREATE POLICY "Users can manage own prints" ON prints
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [showRegister, setShowRegister] = useState(false);
+            const [isSupabaseConfigured, setIsSupabaseConfigured] = useState(false);
 
             // Параметры принтера
             const [printerCost, setPrinterCost] = useState(50000);
@@ -397,6 +382,31 @@ CREATE POLICY "Users can manage own prints" ON prints
             });
 
             const [activeTab, setActiveTab] = useState('dashboard');
+
+            // Инициализация Supabase после загрузки DOM
+            useEffect(() => {
+                console.log('Initializing Supabase...');
+                console.log('window.supabase:', typeof window.supabase);
+
+                if (typeof window.supabase !== 'undefined' &&
+                    SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
+                    SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
+                    try {
+                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                        setIsSupabaseConfigured(true);
+                        console.log("✅ Supabase initialized successfully");
+                    } catch (error) {
+                        console.error("❌ Supabase initialization error:", error);
+                        setIsSupabaseConfigured(false);
+                    }
+                } else {
+                    console.warn("⚠️ Supabase SDK not loaded or config missing");
+                    console.warn("SDK available:", typeof window.supabase !== 'undefined');
+                    console.warn("URL configured:", SUPABASE_URL !== "YOUR_SUPABASE_URL");
+                    console.warn("Key configured:", SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY");
+                    setIsSupabaseConfigured(false);
+                }
+            }, []);
 
             // Проверка авторизации
             useEffect(() => {

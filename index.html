@@ -388,12 +388,18 @@ CREATE POLICY "Users can manage own prints" ON prints
                 const initSupabase = () => {
                     console.log('Initializing Supabase...');
                     console.log('window.supabase:', typeof window.supabase);
+                    console.log('window.supabase object:', window.supabase);
 
                     if (typeof window.supabase !== 'undefined' &&
                         SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
                         SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY") {
                         try {
-                            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                            // UMD версия может экспортировать в window.supabase.supabase
+                            const supabaseLib = window.supabase.supabase || window.supabase;
+                            console.log('supabaseLib:', supabaseLib);
+                            console.log('createClient:', typeof supabaseLib.createClient);
+
+                            supabase = supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                             setIsSupabaseConfigured(true);
                             console.log("✅ Supabase initialized successfully");
                         } catch (error) {
